@@ -8,26 +8,26 @@ pub struct Boid {
 }
 
 impl Boid {
+    /* 
     pub fn new(entity: Entity) -> Boid {
         Boid {
             position: Vec3::new(0.0, 0.0, 0.0),
             velocity: Vec3::new(0.0, 0.0, 0.0),        
         }
     }
+    */
 
     pub fn apply_rules(&mut self, boids: &Vec<Boid>, time: &Res<Time>) {
         let acceleration = self.calculate_coherence_acceleration(boids) 
             + self.calculate_seperation_acceleration(boids) 
             + self.calculate_alignment_acceleration(boids);
 
-        self.velocity += (acceleration * time.delta().as_secs_f32());
-        
+        self.velocity += acceleration * time.delta().as_secs_f32();        
         self.apply_speed_limit();
-
     }
 
     pub fn apply_speed_limit(&mut self) {
-        let speed_limit = 0.1;
+        let speed_limit = 0.3;
         if self.velocity.length() > speed_limit {
             self.velocity = self.velocity.normalize() * speed_limit;
         }

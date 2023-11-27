@@ -1,7 +1,7 @@
 use bevy::{prelude::*, render::mesh, utils::HashMap};
 pub mod boid;
+use bevy_mod_raycast::prelude::*;
 use boid::Boid;
-use log::info;
 
 #[derive(Resource)]
 pub struct BoidEntityStore {
@@ -19,9 +19,11 @@ impl BoidEntityStore {
         self.entities.insert(entity, boid);
     }
 
+    /*
     pub fn get(&self, entity: Entity) -> Boid {
         return self.entities.get(&entity).unwrap().clone();
     }
+    */
 
     pub fn get_all(&self) -> Vec<Boid> {
         let mut boids = Vec::new();
@@ -36,9 +38,17 @@ pub struct BoidPlugin;
 impl Plugin for BoidPlugin {
     fn build(&self, app: &mut App) {
         app
+            .add_plugins(DefaultRaycastingPlugin)
             .insert_resource(BoidEntityStore::new())
             .add_systems(Startup, initialize_flock)
+            .add_systems(Update, mouse_input)
             .add_systems(Update, update_flock);
+    }
+}
+
+fn mouse_input(cursor_ray: Res<CursorRay>, mut raycast: Raycast, mut gizmos: Gizmos) {
+    if let Some(cursor_ray) = **cursor_ray {
+        raycast.debug_cast_ray(cursor_ray, &default(), &mut gizmos);
     }
 }
 
@@ -84,19 +94,29 @@ fn initialize_flock(
     }
 }
 
-fn update_flock(mut query: Query<(Entity, &mut Transform, &mut boid::Boid)>, mut boid_store: ResMut<BoidEntityStore>, time: Res<Time>) {
+fn update_flock(
+    mut query: Query<(Entity, &mut Transform, &mut boid::Boid)>,
+    mut boid_store: ResMut<BoidEntityStore>, 
+    time: Res<Time>,
+    mut raycast: Raycast,
+    mut gizmos: Gizmos
+) {
     let boids = boid_store.get_all();
     //info!("boids: {:?}", boids);
     for (entity, mut transform, mut boid) in query.iter_mut() {
         boid.apply_rules(&boids, &time);
 
+        raycast.debug_cast_ray(Ray3d::new(boid.position, boid.velocity), 
+            &default(), 
+            &mut gizmos);
+
         transform.translation.x += boid.velocity.x;
         transform.translation.y += boid.velocity.y;
         transform.translation.z += boid.velocity.z;
 
+
         boid.position = transform.translation;
         boid_store.add(entity, boid.clone());
-
     }
-
 }
+
