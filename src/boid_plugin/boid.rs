@@ -27,7 +27,7 @@ impl Boid {
             + self.calculate_coherence_acceleration(&neighboring_boids) 
             + self.calculate_seperation_acceleration(&neighboring_boids) 
             + self.calculate_alignment_acceleration(&neighboring_boids)
-            + (*target - self.position) * 0.5;
+            + self.calculate_target_acceleration(target);
         
 
         acceleration.y = 0.0;        
@@ -36,10 +36,17 @@ impl Boid {
     }
 
     pub fn apply_speed_limit(&mut self) {
-        let speed_limit = 0.5;
+        let speed_limit = 0.2;
         if self.velocity.length() > speed_limit {
             self.velocity = self.velocity.normalize() * speed_limit;
         }
+    }
+
+    pub fn calculate_target_acceleration(&mut self, target: &Vec3) -> Vec3 {
+        if self.position.distance(*target) < 1.0 {
+            return Vec3::new(0.0, 0.0, 0.0);
+        }
+        (*target - self.position)
     }
 
     /// Calculates the coherence acceleration for the current boid based on its neighbors.
@@ -52,11 +59,11 @@ impl Boid {
     /// 
     /// The coherence acceleration as a `Vec3` (3D vector).
     pub fn calculate_coherence_acceleration(&mut self, boids: &Vec<&Boid>) -> Vec3 {
-        let coherence_factor = 0.1;
+        let coherence_factor = 0.0001;
         let mut center = Vec3::new(0.0, 0.0, 0.0);
         let mut neighbors = 0;
 
-        let neighborhood_radius = 5.0;
+        let neighborhood_radius = 10.0;
 
         for boid in boids.iter() {
             if boid.position.distance(self.position) < neighborhood_radius {
@@ -86,7 +93,7 @@ impl Boid {
     /// 
     /// The separation acceleration as a `Vec3` (3D vector).
     pub fn calculate_seperation_acceleration(&mut self, boids: &Vec<&Boid>) -> Vec3 {
-        let separation_factor = 10 as f32;
+        let separation_factor = 1 as f32;
         let mut separation = Vec3::new(0.0, 0.0, 0.0);
         let desired_separation = 0.5 as f32;
 
@@ -100,7 +107,7 @@ impl Boid {
     }
 
     pub fn calculate_alignment_acceleration(&mut self, boids: &Vec<&Boid>) -> Vec3{
-        let alignment_factor = 10 as f32;
+        let alignment_factor = 1 as f32;
         let mut alignment = Vec3::new(0.0, 0.0, 0.0);
         let neighborhood_radius = 5.0;
         let mut neighbors = 0;
