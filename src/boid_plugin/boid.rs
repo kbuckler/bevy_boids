@@ -30,14 +30,13 @@ impl Boid {
             + (*target - self.position) * 0.5;
         
 
-        acceleration.y = 0.0;
-
+        acceleration.y = 0.0;        
         self.velocity += acceleration * time.delta().as_secs_f32();        
         self.apply_speed_limit();
     }
 
     pub fn apply_speed_limit(&mut self) {
-        let speed_limit = 0.1;
+        let speed_limit = 0.5;
         if self.velocity.length() > speed_limit {
             self.velocity = self.velocity.normalize() * speed_limit;
         }
