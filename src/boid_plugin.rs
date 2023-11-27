@@ -1,55 +1,108 @@
-use bevy::{prelude::*, render::mesh, utils::HashMap};
-pub mod boid;
+use bevy::{prelude::*, render::mesh};
 use bevy_mod_raycast::prelude::*;
+
+pub mod boid;
+pub mod boid_entity_store;
+
 use boid::Boid;
+use boid_entity_store::BoidEntityStore;
 
-#[derive(Resource)]
-pub struct BoidEntityStore {
-    entities: HashMap<Entity, Boid>
-}
+#[derive(Component)]
+pub struct GroundPlane;
 
-impl BoidEntityStore {
-    pub fn new() -> BoidEntityStore {
-        BoidEntityStore {
-            entities: HashMap::new()
-        }
-    }
+#[derive(Component)]
+pub struct FlockTarget;
 
-    pub fn add(&mut self, entity: Entity, boid: Boid) {
-        self.entities.insert(entity, boid);
-    }
-
-    /*
-    pub fn get(&self, entity: Entity) -> Boid {
-        return self.entities.get(&entity).unwrap().clone();
-    }
-    */
-
-    pub fn get_all(&self) -> Vec<Boid> {
-        let mut boids = Vec::new();
-        for (_, boid) in self.entities.iter() {
-            boids.push(boid.clone());
-        }
-        return boids;
-    }
-
-}
 pub struct BoidPlugin; 
 impl Plugin for BoidPlugin {
     fn build(&self, app: &mut App) {
         app
             .add_plugins(DefaultRaycastingPlugin)
             .insert_resource(BoidEntityStore::new())
-            .add_systems(Startup, initialize_flock)
+
+            .add_systems(Startup, (initialize_flock, initialize_scene))
+            //.add_systems(Update, debug_boids)
             .add_systems(Update, mouse_input)
             .add_systems(Update, update_flock);
     }
 }
 
-fn mouse_input(cursor_ray: Res<CursorRay>, mut raycast: Raycast, mut gizmos: Gizmos) {
-    if let Some(cursor_ray) = **cursor_ray {
-        raycast.debug_cast_ray(cursor_ray, &default(), &mut gizmos);
+
+fn debug_boids(boid_store: Res<BoidEntityStore> , mut gizmos: Gizmos) {
+    for boid in boid_store.get_all() {
+        gizmos.line(
+            boid.position,
+            boid.position + (20.0 * boid.velocity),
+            Color::rgb(0.0, 1.0, 0.0),
+        );
     }
+}
+
+fn mouse_input(
+    cursor_ray: Res<CursorRay>, 
+    mut raycast: Raycast, 
+   // mut gizmos: Gizmos, 
+    ground_query: Query<(Entity, &GroundPlane)>,
+    mut target_query: Query<(&mut Transform, With<FlockTarget>)>,
+    mouse_button_input: Res<Input<MouseButton>>,
+) {
+    if let Some(cursor_ray) = **cursor_ray {
+        if mouse_button_input.pressed(MouseButton::Left) {      
+            let hits = raycast.cast_ray(cursor_ray, &RaycastSettings::default());
+            if let Some((entity, intersection_data)) = hits.first() {
+                if entity == &ground_query.iter().next().unwrap().0 {            
+                    let mut target = target_query.iter_mut().next().unwrap();
+                    target.0.translation = intersection_data.position();
+                    /* 
+                    gizmos.line(
+                        intersection_data.position(),
+                        intersection_data.position() + (20.0 * intersection_data.normal()),
+                        Color::rgb(1.0, 0.0, 0.0),
+                    );
+                    */
+                }                
+            }
+        }
+    }
+}
+
+fn initialize_scene(
+    mut commands: Commands, 
+    mut meshes: ResMut<Assets<Mesh>>, 
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
+    commands
+        .spawn(PbrBundle {
+            mesh: meshes.add(shape::Plane { size: 100.0, subdivisions: 4 }.into()),
+            material: materials.add(Color::WHITE.into()),
+            ..default()
+        })
+        .insert(GroundPlane);
+
+    let material = materials.add(StandardMaterial {
+        base_color: Color::rgb(0.0, 1.0, 0.0),
+        perceptual_roughness: 0.6,
+        metallic: 0.5,
+        ..default()
+    });
+
+    let mesh =  meshes.add(Mesh::from(mesh::shape::Cube { 
+        size: 0.1
+    }));
+
+    commands
+        .spawn(
+            PbrBundle {
+                mesh: mesh.clone(),
+                material: material.clone(),
+                transform: Transform { 
+                    translation: Vec3::new(0.0, 0.0, 0.0),
+                    ..Transform::default()
+                },
+                ..PbrBundle::default()
+            })
+        .insert(FlockTarget);
+
 }
 
 fn initialize_flock(
@@ -66,13 +119,13 @@ fn initialize_flock(
     });
 
     let mesh =  meshes.add(Mesh::from(mesh::shape::Cube { 
-        size: 0.1 
+        size: 0.2 
     }));
 
-    for i in -3..3 {
-        for j in -3..3 {
+    for i in -5..5 {
+        for j in -5..5 {
             let boid = Boid {
-                position: Vec3::new(i as f32, 0.0, j as f32),
+                position: Vec3::new(i as f32, 0.1, j as f32),
                 velocity: Vec3::new(0.0, 0.0, 0.0),            
             };
             let entity = commands
@@ -96,24 +149,19 @@ fn initialize_flock(
 
 fn update_flock(
     mut query: Query<(Entity, &mut Transform, &mut boid::Boid)>,
+    mut target_query: Query<(&Transform, With<FlockTarget>, Without<boid::Boid>)>,
     mut boid_store: ResMut<BoidEntityStore>, 
     time: Res<Time>,
-    mut raycast: Raycast,
-    mut gizmos: Gizmos
 ) {
     let boids = boid_store.get_all();
-    //info!("boids: {:?}", boids);
-    for (entity, mut transform, mut boid) in query.iter_mut() {
-        boid.apply_rules(&boids, &time);
 
-        raycast.debug_cast_ray(Ray3d::new(boid.position, boid.velocity), 
-            &default(), 
-            &mut gizmos);
+    for (entity, mut transform, mut boid) in query.iter_mut() {
+        let target = target_query.iter_mut().next().unwrap().0.translation;
+        boid.apply_rules(&boids, &target, &time);
 
         transform.translation.x += boid.velocity.x;
         transform.translation.y += boid.velocity.y;
         transform.translation.z += boid.velocity.z;
-
 
         boid.position = transform.translation;
         boid_store.add(entity, boid.clone());
