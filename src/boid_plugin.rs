@@ -22,7 +22,7 @@ impl Plugin for BoidPlugin {
             .add_plugins(RapierPhysicsPlugin::<NoUserData>::default())
             .add_plugins(RapierDebugRenderPlugin::default())
             .insert_resource(RapierConfiguration {
-                gravity: Vec3::new(0.0, 0.0, 0.0),
+           //     gravity: Vec3::new(0.0, 0.0, 0.0),
                 ..Default::default()
             })
             .insert_resource(BoidEntityStore::new())
@@ -78,11 +78,20 @@ fn initialize_scene(
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
 
+
+    let ground_plane = shape::Plane { size: 100.0, subdivisions: 4 }.into();
+
+
     commands
         .spawn(PbrBundle {
-            mesh: meshes.add(shape::Plane { size: 100.0, subdivisions: 4 }.into()),
+            mesh: meshes.add(ground_plane),
             material: materials.add(Color::WHITE.into()),
             ..default()
+        })
+        .insert(Collider::cuboid(50.0, 0.01, 50.0))
+        .insert(Friction { 
+            coefficient: 0.25, 
+            combine_rule: CoefficientCombineRule::Average 
         })
         .insert(GroundPlane);
 
@@ -132,7 +141,7 @@ fn initialize_flock(
     for i in -5..5 {
         for j in -5..5 {
             let boid = Boid {
-                position: Vec3::new(i as f32, 0.1, j as f32),
+                position: Vec3::new(i as f32, 0.5, j as f32),
                 velocity: Vec3::new(0.0, 0.0, 0.0),            
             };
             let entity = commands
@@ -149,7 +158,7 @@ fn initialize_flock(
                 .insert(boid)
                 .insert(RigidBody::Dynamic)
                 .insert(Collider::cuboid(0.1, 0.1, 0.1))                    
-                .insert(Restitution::coefficient(0.0))
+                .insert(Restitution::coefficient(0.5))
                 .insert(ColliderMassProperties::Density(1.0))
                 .insert(Velocity::default())
                 .insert(ExternalForce {
@@ -176,7 +185,7 @@ fn update_flock(
         boid.position = transform.translation;
         boid.apply_rules(&boids, &target, &time);
         
-        impulse.force = 0.01 * boid.velocity;
+        impulse.force = 0.1 * boid.velocity;
 
         boid_store.add(entity, boid.clone());
     }

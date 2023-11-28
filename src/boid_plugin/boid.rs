@@ -48,13 +48,8 @@ impl Boid {
     }
 
     pub fn calculate_target_acceleration(&mut self, target: &Vec3) -> Vec3 {
-        let vector = *target - self.position;
-
-        if(vector.length() < 2.)
-        {
-            return vector.normalize();
-        }
-        vector * 2.0
+        let vector = *target - self.position;        
+        vector.normalize() * vector.length()
     }
 
     /// Calculates the coherence acceleration for the current boid based on its neighbors.
