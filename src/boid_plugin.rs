@@ -1,5 +1,6 @@
 use bevy::{prelude::*, render::mesh};
 use bevy_mod_raycast::prelude::*;
+use bevy_rapier3d::prelude::*;
 
 pub mod boid;
 pub mod boid_entity_store;
@@ -18,8 +19,13 @@ impl Plugin for BoidPlugin {
     fn build(&self, app: &mut App) {
         app
             .add_plugins(DefaultRaycastingPlugin)
+            .add_plugins(RapierPhysicsPlugin::<NoUserData>::default())
+            .add_plugins(RapierDebugRenderPlugin::default())
+            .insert_resource(RapierConfiguration {
+                gravity: Vec3::new(0.0, 0.0, 0.0),
+                ..Default::default()
+            })
             .insert_resource(BoidEntityStore::new())
-
             .add_systems(Startup, (initialize_flock, initialize_scene))
             //.add_systems(Update, debug_boids)
             .add_systems(Update, mouse_input)
@@ -71,6 +77,7 @@ fn initialize_scene(
     mut meshes: ResMut<Assets<Mesh>>, 
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
+
     commands
         .spawn(PbrBundle {
             mesh: meshes.add(shape::Plane { size: 100.0, subdivisions: 4 }.into()),
@@ -140,6 +147,15 @@ fn initialize_flock(
                         ..PbrBundle::default()
                     })
                 .insert(boid)
+                .insert(RigidBody::Dynamic)
+                .insert(Collider::cuboid(0.1, 0.1, 0.1))                    
+                .insert(Restitution::coefficient(0.0))
+                .insert(ColliderMassProperties::Density(1.0))
+                .insert(Velocity::default())
+                .insert(ExternalForce {
+                    force: Vec3::new(0., 0., 0.),                    
+                    torque: Vec3::new(0., 0., 0.),     
+                }) 
                 .id();
 
             boid_store.add(entity, boid);
@@ -148,22 +164,20 @@ fn initialize_flock(
 }
 
 fn update_flock(
-    mut query: Query<(Entity, &mut Transform, &mut boid::Boid)>,
+    mut query: Query<(Entity, &mut ExternalForce, &mut boid::Boid, &Transform)>,
     mut target_query: Query<(&Transform, With<FlockTarget>, Without<boid::Boid>)>,
     mut boid_store: ResMut<BoidEntityStore>, 
     time: Res<Time>,
 ) {
     let boids = boid_store.get_all();
 
-    for (entity, mut transform, mut boid) in query.iter_mut() {
+    for (entity, mut impulse, mut boid, transform) in query.iter_mut() {
         let target = target_query.iter_mut().next().unwrap().0.translation;
-        boid.apply_rules(&boids, &target, &time);
-
-        transform.translation.x += boid.velocity.x;
-        transform.translation.y += boid.velocity.y;
-        transform.translation.z += boid.velocity.z;
-
         boid.position = transform.translation;
+        boid.apply_rules(&boids, &target, &time);
+        
+        impulse.force = 0.01 * boid.velocity;
+
         boid_store.add(entity, boid.clone());
     }
 }
