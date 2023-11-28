@@ -3,10 +3,7 @@ use bevy_mod_raycast::prelude::*;
 use bevy_rapier3d::prelude::*;
 
 pub mod boid;
-pub mod boid_entity_store;
-
 use boid::Boid;
-use boid_entity_store::BoidEntityStore;
 
 #[derive(Component)]
 pub struct GroundPlane;
@@ -25,7 +22,6 @@ impl Plugin for BoidPlugin {
            //     gravity: Vec3::new(0.0, 0.0, 0.0),
                 ..Default::default()
             })
-            .insert_resource(BoidEntityStore::new())
             .add_systems(Startup, (initialize_flock, initialize_scene))
             //.add_systems(Update, debug_boids)
             .add_systems(Update, mouse_input)
@@ -33,7 +29,7 @@ impl Plugin for BoidPlugin {
     }
 }
 
-
+/* 
 fn debug_boids(boid_store: Res<BoidEntityStore> , mut gizmos: Gizmos) {
     for boid in boid_store.get_all() {
         gizmos.line(
@@ -43,6 +39,7 @@ fn debug_boids(boid_store: Res<BoidEntityStore> , mut gizmos: Gizmos) {
         );
     }
 }
+*/
 
 fn mouse_input(
     cursor_ray: Res<CursorRay>, 
@@ -90,7 +87,7 @@ fn initialize_scene(
         })
         .insert(Collider::cuboid(50.0, 0.01, 50.0))
         .insert(Friction { 
-            coefficient: 0.25, 
+            coefficient: 0.01, 
             combine_rule: CoefficientCombineRule::Average 
         })
         .insert(GroundPlane);
@@ -125,7 +122,6 @@ fn initialize_flock(
     mut commands: Commands, 
     mut meshes: ResMut<Assets<Mesh>>, 
     mut materials: ResMut<Assets<StandardMaterial>>,
-    mut boid_store: ResMut<BoidEntityStore>
 ) {
     let material = materials.add(StandardMaterial {
         base_color: Color::rgb(0.5, 0.5, 1.0),
@@ -140,22 +136,24 @@ fn initialize_flock(
 
     for i in -5..5 {
         for j in -5..5 {
-            let boid = Boid {
-                position: Vec3::new(i as f32, 0.5, j as f32),
-                velocity: Vec3::new(0.0, 0.0, 0.0),            
-            };
+         
+            let position = Vec3::new(i as f32, 0.5, j as f32);
+                  
             let entity = commands
                 .spawn(
                     PbrBundle {
                         mesh: mesh.clone(),
                         material: material.clone(),
                         transform: Transform { 
-                            translation: boid.position,
+                            translation: position,
                             ..Transform::default()
                         },
                         ..PbrBundle::default()
                     })
-                .insert(boid)
+                .insert(Boid {
+                    position: position,
+                    velocity: Vec3::new(0.0, 0.0, 0.0)
+                })
                 .insert(RigidBody::Dynamic)
                 .insert(Collider::cuboid(0.1, 0.1, 0.1))                    
                 .insert(Restitution::coefficient(0.5))
@@ -166,8 +164,6 @@ fn initialize_flock(
                     torque: Vec3::new(0., 0., 0.),     
                 }) 
                 .id();
-
-            boid_store.add(entity, boid);
         }
     }
 }
@@ -175,19 +171,17 @@ fn initialize_flock(
 fn update_flock(
     mut query: Query<(Entity, &mut ExternalForce, &mut boid::Boid, &Transform)>,
     mut target_query: Query<(&Transform, With<FlockTarget>, Without<boid::Boid>)>,
-    mut boid_store: ResMut<BoidEntityStore>, 
-    time: Res<Time>,
+    time: Res<Time>,    
 ) {
-    let boids = boid_store.get_all();
+
+    let boids = &mut query.iter_mut().map(|(_, _, boid, _)| *boid).collect::<Vec<Boid>>();
 
     for (entity, mut impulse, mut boid, transform) in query.iter_mut() {
         let target = target_query.iter_mut().next().unwrap().0.translation;
         boid.position = transform.translation;
-        boid.apply_rules(&boids, &target, &time);
+        boid.apply_rules(boids, &target, &time);
         
         impulse.force = 0.1 * boid.velocity;
-
-        boid_store.add(entity, boid.clone());
     }
 }
 

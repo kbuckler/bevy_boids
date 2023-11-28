@@ -18,11 +18,9 @@ impl Boid {
     }
     */
 
-    pub fn apply_rules(&mut self, boids: &Vec<Boid>, target: &Vec3, time: &Res<Time>) {
-
-
+    pub fn apply_rules(&mut self, other_boids: &Vec<Boid>, target: &Vec3, time: &Res<Time>) {
         let neighborhood_radius = 10.0;
-        let neighboring_boids = boids.iter()
+        let neighboring_boids = other_boids.iter()
             .filter(|boid| boid.position.distance(self.position) < neighborhood_radius)
             .collect::<Vec<&Boid>>();
 
