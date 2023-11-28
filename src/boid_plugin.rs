@@ -169,18 +169,19 @@ fn initialize_flock(
 }
 
 fn update_flock(
-    mut query: Query<(Entity, &mut ExternalForce, &mut boid::Boid, &Transform)>,
+    mut query: Query<(&mut ExternalForce, &mut boid::Boid, &Transform)>,
     mut target_query: Query<(&Transform, With<FlockTarget>, Without<boid::Boid>)>,
     time: Res<Time>,    
 ) {
 
-    let boids = &mut query.iter_mut().map(|(_, _, boid, _)| *boid).collect::<Vec<Boid>>();
-
-    for (entity, mut impulse, mut boid, transform) in query.iter_mut() {
-        let target = target_query.iter_mut().next().unwrap().0.translation;
+    let boids = &mut query.iter_mut().map(|(_, mut boid, transform)| {
         boid.position = transform.translation;
-        boid.apply_rules(boids, &target, &time);
-        
+        boid.clone()
+    }).collect();
+
+    let target = target_query.iter_mut().next().unwrap().0.translation;
+    for (mut impulse, mut boid, transform) in query.iter_mut() {
+        boid.apply_rules(boids, &target, &time);        
         impulse.force = 0.1 * boid.velocity;
     }
 }
