@@ -135,11 +135,9 @@ fn initialize_flock(
     }));
 
     for i in -5..5 {
-        for j in -5..5 {
-         
-            let position = Vec3::new(i as f32, 0.5, j as f32);
-                  
-            let entity = commands
+        for j in -5..5 {         
+            let position = Vec3::new(i as f32, 0.5, j as f32);                  
+            commands
                 .spawn(
                     PbrBundle {
                         mesh: mesh.clone(),
@@ -156,14 +154,13 @@ fn initialize_flock(
                 })
                 .insert(RigidBody::Dynamic)
                 .insert(Collider::cuboid(0.1, 0.1, 0.1))                    
-                .insert(Restitution::coefficient(0.5))
+                .insert(Restitution::coefficient(0.01))
                 .insert(ColliderMassProperties::Density(1.0))
                 .insert(Velocity::default())
                 .insert(ExternalForce {
                     force: Vec3::new(0., 0., 0.),                    
                     torque: Vec3::new(0., 0., 0.),     
-                }) 
-                .id();
+                });
         }
     }
 }
@@ -182,7 +179,7 @@ fn update_flock(
     let target = target_query.iter_mut().next().unwrap().0.translation;
     for (mut impulse, mut boid, transform) in query.iter_mut() {
         boid.apply_rules(boids, &target, &time);        
-        impulse.force = 0.1 * boid.velocity;
+        impulse.force = boid.velocity;
     }
 }
 
