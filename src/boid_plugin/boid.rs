@@ -1,11 +1,12 @@
 
 use bevy::prelude::*;
-use log::info;
+// use log::info;
 
 #[derive(Component, Debug, Clone, Copy)]
 pub struct Boid {
     pub position: Vec3,
     pub velocity: Vec3,
+    pub target_position: Vec3,
 }
 
 impl Boid {
@@ -18,7 +19,11 @@ impl Boid {
     }
     */
 
-    pub fn apply_rules(&mut self, other_boids: &Vec<Boid>, target: &Vec3, time: &Res<Time>) {
+    pub fn reached_target(&self) -> bool {
+        self.position.distance(self.target_position) < 0.1
+    }
+
+    pub fn apply_rules(&mut self, other_boids: &Vec<Boid>, time: &Res<Time>) {
         let neighborhood_radius = 2.0;
         let neighboring_boids = other_boids.iter()
             .filter(|boid| boid.position.distance(self.position) < neighborhood_radius)
@@ -28,7 +33,7 @@ impl Boid {
            + self.calculate_coherence_acceleration(&neighboring_boids) 
             + self.calculate_seperation_acceleration(&neighboring_boids) 
             + self.calculate_alignment_acceleration(&neighboring_boids)
-            + self.calculate_target_acceleration(target)
+            + self.calculate_target_acceleration()
             + Vec3::new(0.0, 0.0, 0.0);
                  
         self.velocity = acceleration * time.delta().as_secs_f32();        
@@ -42,8 +47,8 @@ impl Boid {
         }
     }
 
-    pub fn calculate_target_acceleration(&mut self, target: &Vec3) -> Vec3 {
-        *target - self.position      
+    pub fn calculate_target_acceleration(&mut self) -> Vec3 {
+        self.target_position - self.position      
     }
 
     /// Calculates the coherence acceleration for the current boid based on its neighbors.
