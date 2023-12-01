@@ -24,7 +24,7 @@ impl Plugin for BoidPlugin {
             })
             .add_systems(Startup, (initialize_flock, initialize_scene))
             //.add_systems(Update, debug_boids)
-            .add_systems(Update, mouse_input)
+            .add_systems(Update, mouse_input_system)
             .add_systems(Update, update_boid_targets)
             .add_systems(Update, update_flock);
     }
@@ -42,13 +42,14 @@ fn debug_boids(boid_store: Res<BoidEntityStore> , mut gizmos: Gizmos) {
 }
 */
 
-fn mouse_input(
+fn mouse_input_system(
     cursor_ray: Res<CursorRay>, 
     mut raycast: Raycast, 
    // mut gizmos: Gizmos, 
     ground_query: Query<(Entity, &GroundPlane)>,
     mut target_query: Query<(&mut Transform, With<FlockTarget>)>,
     mouse_button_input: Res<Input<MouseButton>>,
+    mut boid_query: Query<&mut boid::Boid>,
 ) {
     if mouse_button_input.pressed(MouseButton::Left) {   
         if let Some(cursor_ray) = **cursor_ray {
@@ -57,6 +58,12 @@ fn mouse_input(
                 if entity == &ground_query.iter().next().unwrap().0 {            
                     let mut target = target_query.iter_mut().next().unwrap();
                     target.0.translation = intersection_data.position();
+
+                    // update all boid targets to the new target position
+                    for mut boid in boid_query.iter_mut() {
+                        boid.target_position = Some(intersection_data.position());
+                    }
+
                 }                
             }
         }
@@ -125,11 +132,15 @@ fn initialize_flock(
         size: 0.2 
     }));
 
+
     for i in -5..5 {
         for j in -5..5 {         
             let position = Vec3::new(i as f32, 0.5, j as f32);                  
+            let boid = Boid::new(position, material.clone());
+
             commands
-                .spawn(
+                .spawn(boid)
+                .insert(
                     PbrBundle {
                         mesh: mesh.clone(),
                         material: material.clone(),
@@ -139,11 +150,6 @@ fn initialize_flock(
                         },
                         ..PbrBundle::default()
                     })
-                .insert(Boid {
-                    position: position,
-                    velocity: Vec3::new(0.0, 0.0, 0.0),
-                    target_position: Vec3::new(0.0, 0.0, 0.0),
-                })
                 .insert(RigidBody::Dynamic)
                 .insert(Collider::cuboid(0.1, 0.1, 0.1))                    
                 .insert(Restitution::coefficient(0.01))
@@ -159,7 +165,6 @@ fn initialize_flock(
 
 fn update_flock(
     mut query: Query<(&mut ExternalForce, &mut boid::Boid, &Transform)>,
-    mut target_query: Query<(&Transform, With<FlockTarget>, Without<boid::Boid>)>,
     time: Res<Time>,    
 ) {
 
@@ -173,16 +178,14 @@ fn update_flock(
         impulse.force = boid.velocity;
     }
 }
+
 fn update_boid_targets(
     mut query: Query<&mut boid::Boid>,
-    mut target_query: Query<(&Transform, With<FlockTarget>, Without<boid::Boid>)>,
-    time: Res<Time>,    
 ) {
-
-    let target_position = target_query.iter_mut().next().unwrap().0.translation;
-
     for mut boid in query.iter_mut() {
-        boid.target_position = target_position;
+        if boid.reached_target() {
+            boid.target_position = None;
+        } 
     }
 }
 
