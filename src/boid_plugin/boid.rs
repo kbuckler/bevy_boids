@@ -1,5 +1,6 @@
 
 use bevy::prelude::*;
+use rand::prelude::*;
 // use log::info;
 
 #[derive(Component, Debug, Clone)]
@@ -50,6 +51,7 @@ impl Boid {
             + self.calculate_seperation_acceleration(&neighboring_boids) 
            // + self.calculate_alignment_acceleration(&neighboring_boids)
             + self.calculate_target_acceleration()
+            + self.calculate_random_acceleration()
             + Vec3::new(0.0, 0.0, 0.0);
                  
         self.velocity = acceleration * time.delta().as_secs_f32();        
@@ -61,6 +63,15 @@ impl Boid {
         if self.velocity.length() > speed_limit {
             self.velocity = self.velocity.normalize() * speed_limit;
         }
+    }
+
+    pub fn calculate_random_acceleration(&mut self) -> Vec3 {
+        let random_factor = 0.1 as f32;
+        let mut random = Vec3::new(0.0, 0.0, 0.0);
+        random.x = random_factor * (rand::random::<f32>() - 0.5);
+        random.y = random_factor * (rand::random::<f32>() - 0.5);
+        random.z = random_factor * (rand::random::<f32>() - 0.5);
+        random
     }
 
     pub fn calculate_target_acceleration(&mut self) -> Vec3 {

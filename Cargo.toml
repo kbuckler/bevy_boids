@@ -10,6 +10,7 @@ bevy = { version = "0.12.0", features = ["dynamic_linking"] }
 log = "0.4"
 bevy_mod_raycast = "0.16"
 bevy_rapier3d = "*"
+rand = "0.8.4"
 
 # Enable a small amount of optimization in debug mode
 [profile.dev]
