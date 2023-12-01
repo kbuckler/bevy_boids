@@ -21,16 +21,29 @@ impl Boid {
     }
     pub fn reached_target(&self) -> bool {
         match self.target_position {
-            Some(p) => self.position.distance(p) < 1.0,
-            None => return false,
+            Some(p) => self.position.distance(p) < 0.5,
+            None => return true,
         }
     }
 
     pub fn apply_rules(&mut self, other_boids: &Vec<Boid>, time: &Res<Time>) {
-        let neighborhood_radius = 2.0;
+
+        if self.reached_target() {
+            self.velocity = Vec3::new(0.0, 0.0, 0.0);
+            return;
+        }
+        
+        let neighborhood_radius = 1.0;
         let neighboring_boids = other_boids.iter()
             .filter(|boid| boid.position.distance(self.position) < neighborhood_radius)
             .collect::<Vec<&Boid>>();
+
+
+        neighboring_boids.iter().for_each(|boid| {
+            if boid.reached_target() {
+                self.target_position = None;
+            }
+        });    
 
         let acceleration = Vec3::new(0.0, 0.0, 0.0) 
            //+ self.calculate_coherence_acceleration(&neighboring_boids) 
