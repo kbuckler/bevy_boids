@@ -62,6 +62,7 @@ fn mouse_input_system(
                     // update all boid targets to the new target position
                     for mut boid in boid_query.iter_mut() {
                         boid.target_position = Some(intersection_data.position());
+                        boid.boid_state = boid::BoidState::Moving;
                     }
 
                 }                
@@ -85,7 +86,7 @@ fn initialize_scene(
         })
         .insert(Collider::cuboid(50.0, 0.01, 50.0))
         .insert(Friction { 
-            coefficient: 0.01, 
+            coefficient: 0.1, 
             combine_rule: CoefficientCombineRule::Average 
         })
         .insert(GroundPlane);
@@ -152,7 +153,7 @@ fn initialize_flock(
                     })
                 .insert(RigidBody::Dynamic)
                 .insert(Collider::cuboid(0.1, 0.1, 0.1))                    
-                .insert(Restitution::coefficient(0.01))
+                .insert(Restitution::coefficient(0.1))
                 .insert(ColliderMassProperties::Density(1.0))
                 .insert(Velocity::default())
                 .insert(ExternalForce {
@@ -175,6 +176,7 @@ fn update_flock(
 
     for (mut impulse, mut boid, _) in query.iter_mut() {
         boid.apply_rules(boids, &time);        
+        
         impulse.force = boid.velocity;
     }
 }
@@ -182,9 +184,12 @@ fn update_flock(
 fn update_boid_targets(
     mut query: Query<&mut boid::Boid>,
 ) {
+    return; 
+
     for mut boid in query.iter_mut() {
         if boid.reached_target() {
             boid.target_position = None;
+            boid.boid_state = boid::BoidState::Idle;
         } 
     }
 }
