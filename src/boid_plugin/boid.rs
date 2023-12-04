@@ -2,22 +2,46 @@
 use bevy::prelude::*;
 // use log::info;
 
+#[derive(Resource)]
+pub struct BoidConfig {
+    // The coherence factor determines the strength of the coherence behavior for the boid.
+    // A higher coherence factor will result in stronger alignment behavior.
+    coherence_factor: f32,
+
+    // The separation factor determines the strength of separation behavior for the boid.
+    // A higher separation factor will result in boids maintaining a greater distance from each other.
+    separation_factor: f32,
+
+    // The factor used to determine the influence of the target on the boid's behavior.
+    // A higher value will result in a stronger attraction towards the target.
+    target_factor:  f32,
+
+    // The alignment factor determines how strongly a boid aligns its velocity with its neighbors.
+    // It is a value between 0 and 1, where 0 means no alignment and 1 means full alignment.
+    alignment_factor: f32,
+}
+impl Default for BoidConfig {
+    fn default() -> Self {
+        BoidConfig {
+            coherence_factor: 25.0,
+            separation_factor: 100.0,
+            target_factor: 25.0,
+            alignment_factor: 0.9,
+        }
+    }
+}
 
 #[derive(Debug, Clone)]
 pub enum BoidState {
     Idle,
     Moving,
 }
-
-impl BoidState{
-
-}
-
 impl Default for BoidState {
     fn default() -> Self {
         BoidState::Idle
     }
 }
+
 #[derive(Component, Debug, Clone)]
 pub struct Boid {
     pub boid_state: BoidState,
@@ -25,10 +49,7 @@ pub struct Boid {
     pub velocity: Vec3,
     pub target_position: Option<Vec3>,
     pub material: Handle<StandardMaterial>
-
 }
-
-
 
 impl Boid {
     pub fn new(position: Vec3, material: Handle<StandardMaterial>) -> Boid {
@@ -40,6 +61,7 @@ impl Boid {
             material: material
         }
     }
+
     pub fn reached_target(&self) -> bool {
         match self.target_position {
             Some(p) => self.position.distance(p) < 0.5,
@@ -47,67 +69,33 @@ impl Boid {
         }
     }
 
-    pub fn apply_rules(&mut self, other_boids: &Vec<Boid>, time: &Res<Time>) {        
+    pub fn apply_rules(&mut self, other_boids: &Vec<Boid>, time: &Res<Time>, config: &Res<BoidConfig>) {        
         match self.boid_state {
             BoidState::Idle => { 
 
             },
             BoidState::Moving => {
-                self.apply_moving_rules(other_boids, time);
+                self.apply_moving_rules(other_boids, time, config);
             }
         }
     }
 
-    fn apply_moving_rules(&mut self, other_boids: &Vec<Boid>, time: &Res<Time>) {
+    fn apply_moving_rules(&mut self, other_boids: &Vec<Boid>, time: &Res<Time>, config: &Res<BoidConfig>) {
         let neighborhood_radius = 100.0;
         let neighboring_boids = other_boids.iter()
             .filter(|boid| boid.position.distance(self.position) < neighborhood_radius)
             .collect::<Vec<&Boid>>();
-/*
-        neighboring_boids.iter().for_each(|boid| {
-            match boid.boid_state {
-                BoidState::Idle => {
-                    match self.target_position {
-                        Some(p) => {
-                            if self.position.distance(p) < 0.5 {
-                                self.target_position = None;
-                                self.boid_state = BoidState::Idle;
-                            }
-                        },
-                        None => { },
-                    }
-                },
-                BoidState::Moving => { },
-            }
-        });    
-*/
-
-        // The coherence factor determines the strength of the coherence behavior for the boid.
-        // A higher coherence factor will result in stronger alignment behavior.
-        let coherence_factor = 25 as f32;
-
-        // The separation factor determines the strength of separation behavior for the boid.
-        // A higher separation factor will result in boids maintaining a greater distance from each other.
-        let separation_factor = 100 as f32;
-
-        // The factor used to determine the influence of the target on the boid's behavior.
-        // A higher value will result in a stronger attraction towards the target.
-        let target_factor = 25 as f32;
-
-        // The alignment factor determines how strongly a boid aligns its velocity with its neighbors.
-        // It is a value between 0 and 1, where 0 means no alignment and 1 means full alignment.
-        let alignment_factor = 0.9 as f32;
 
         let acceleration = Vec3::new(0.0, 0.0, 0.0) 
-            + (coherence_factor * self.calculate_cohesion_force(&neighboring_boids))
-            + (separation_factor * self.calculate_seperation_acceleration(&neighboring_boids))
-            + (target_factor * self.calculate_target_acceleration())
+            + (config.coherence_factor * self.calculate_cohesion_force(&neighboring_boids))
+            + (config.separation_factor * self.calculate_seperation_acceleration(&neighboring_boids))
+            + (config.target_factor * self.calculate_target_acceleration())
             + Vec3::new(0.0, 0.0, 0.0);
                  
         let initial_velocity = acceleration * time.delta().as_secs_f32();  
         let alignment_velocity = self.calculate_alignment_velocity(&neighboring_boids);
 
-        self.velocity =  Vec3::lerp(initial_velocity, alignment_velocity, alignment_factor);     
+        self.velocity =  Vec3::lerp(initial_velocity, alignment_velocity, config.alignment_factor);     
         self.apply_speed_limit();
     }
 

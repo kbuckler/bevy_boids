@@ -3,13 +3,15 @@ use bevy_mod_raycast::prelude::*;
 use bevy_rapier3d::prelude::*;
 
 pub mod boid;
-use boid::Boid;
+use boid::{Boid, BoidConfig};
 
 #[derive(Component)]
 pub struct GroundPlane;
 
 #[derive(Component)]
 pub struct FlockTarget;
+
+
 
 pub struct BoidPlugin; 
 impl Plugin for BoidPlugin {
@@ -22,6 +24,7 @@ impl Plugin for BoidPlugin {
            //     gravity: Vec3::new(0.0, 0.0, 0.0),
                 ..Default::default()
             })
+            .insert_resource(BoidConfig::default())
             .add_systems(Startup, (initialize_flock, initialize_scene))
             //.add_systems(Update, debug_boids)
             .add_systems(Update, mouse_input_system)
@@ -166,6 +169,7 @@ fn initialize_flock(
 
 fn update_flock(
     mut query: Query<(&mut ExternalForce, &mut boid::Boid, &Transform)>,
+    config: Res<BoidConfig>,
     time: Res<Time>,    
 ) {
 
@@ -175,22 +179,15 @@ fn update_flock(
     }).collect();
 
     for (mut impulse, mut boid, _) in query.iter_mut() {
-        boid.apply_rules(boids, &time);        
+        boid.apply_rules(boids, &time, &config);        
         
         impulse.force = boid.velocity;
     }
 }
 
 fn update_boid_targets(
-    mut query: Query<&mut boid::Boid>,
+    mut _query: Query<&mut boid::Boid>,
 ) {
     return; 
-
-    for mut boid in query.iter_mut() {
-        if boid.reached_target() {
-            boid.target_position = None;
-            boid.boid_state = boid::BoidState::Idle;
-        } 
-    }
 }
 
