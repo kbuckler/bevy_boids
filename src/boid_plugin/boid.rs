@@ -1,4 +1,3 @@
-
 use bevy::prelude::*;
 // use log::info;
 
@@ -6,19 +5,22 @@ use bevy::prelude::*;
 pub struct BoidConfig {
     // The coherence factor determines the strength of the coherence behavior for the boid.
     // A higher coherence factor will result in stronger alignment behavior.
-    coherence_factor: f32,
+    pub coherence_factor: f32,
 
     // The separation factor determines the strength of separation behavior for the boid.
     // A higher separation factor will result in boids maintaining a greater distance from each other.
-    separation_factor: f32,
+    pub separation_factor: f32,
 
     // The factor used to determine the influence of the target on the boid's behavior.
     // A higher value will result in a stronger attraction towards the target.
-    target_factor:  f32,
+    pub target_factor:  f32,
 
     // The alignment factor determines how strongly a boid aligns its velocity with its neighbors.
     // It is a value between 0 and 1, where 0 means no alignment and 1 means full alignment.
-    alignment_factor: f32,
+    pub alignment_factor: f32,
+
+    // The desired separation between boids.
+    pub desired_separation: f32,
 }
 impl Default for BoidConfig {
     fn default() -> Self {
@@ -27,6 +29,7 @@ impl Default for BoidConfig {
             separation_factor: 100.0,
             target_factor: 25.0,
             alignment_factor: 0.9,
+            desired_separation: 0.75,
         }
     }
 }
@@ -88,14 +91,14 @@ impl Boid {
 
         let acceleration = Vec3::new(0.0, 0.0, 0.0) 
             + (config.coherence_factor * self.calculate_cohesion_force(&neighboring_boids))
-            + (config.separation_factor * self.calculate_seperation_acceleration(&neighboring_boids))
+            + (config.separation_factor * self.calculate_seperation_acceleration(&neighboring_boids, config.desired_separation))
             + (config.target_factor * self.calculate_target_acceleration())
             + Vec3::new(0.0, 0.0, 0.0);
                  
         let initial_velocity = acceleration * time.delta().as_secs_f32();  
         let alignment_velocity = self.calculate_alignment_velocity(&neighboring_boids);
 
-        self.velocity =  Vec3::lerp(initial_velocity, alignment_velocity, config.alignment_factor);     
+        self.velocity = Vec3::lerp(initial_velocity, alignment_velocity, config.alignment_factor);     
         self.apply_speed_limit();
     }
 
@@ -137,10 +140,8 @@ impl Boid {
         return Vec3::new(0.0, 0.0, 0.0);
     }
 
-     fn calculate_seperation_acceleration(&mut self, boids: &Vec<&Boid>) -> Vec3 {
-        let separation_factor = 15 as f32;
+     fn calculate_seperation_acceleration(&mut self, boids: &Vec<&Boid>, desired_separation: f32) -> Vec3 {
         let mut separation = Vec3::new(0.0, 0.0, 0.0);
-        let desired_separation = 0.75 as f32;
 
         for boid in boids.iter() {            
             let distance = boid.position.distance(self.position);    
@@ -153,7 +154,7 @@ impl Boid {
                     (desired_separation - distance) / desired_separation);
             }            
         }
-        separation * separation_factor
+        separation
     }
 
     pub fn calculate_alignment_velocity(&mut self, boids: &Vec<&Boid>) -> Vec3{
